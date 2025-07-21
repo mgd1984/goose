@@ -8,6 +8,7 @@ import Dot, { LoadingStatus } from './ui/Dot';
 import { NotificationEvent } from '../hooks/useMessageStream';
 import { ChevronRight, LoaderCircle } from 'lucide-react';
 import { TooltipWrapper } from './settings/providers/subcomponents/buttons/TooltipWrapper';
+import { UIResourceRenderer, isUIResource, extractUIResource } from './UIResourceRenderer';
 
 interface ToolCallWithResponseProps {
   isCancelledMessage: boolean;
@@ -513,6 +514,31 @@ interface ToolResultViewProps {
 }
 
 function ToolResultView({ result, isStartExpanded }: ToolResultViewProps) {
+  // Check if this result contains a UI resource
+  const uiResource = isUIResource(result) ? extractUIResource(result) : null;
+
+  if (uiResource) {
+    console.log('✅ Rendering UI resource:', uiResource);
+    return (
+      <ToolCallExpandable
+        label={<span className="pl-4 py-1 font-medium">Interactive Output</span>}
+        isStartExpanded={isStartExpanded}
+      >
+        <div className="pl-4 pr-4 py-4">
+          <UIResourceRenderer
+            resource={uiResource}
+            className="w-full"
+            onUIAction={async (action) => {
+              console.log('UI Action from tool result:', action);
+              // TODO: Implement UI action handling
+              return { status: 'handled' };
+            }}
+          />
+        </div>
+      </ToolCallExpandable>
+    );
+  }
+
   return (
     <ToolCallExpandable
       label={<span className="pl-4 py-1 font-medium">Output</span>}
@@ -535,6 +561,18 @@ function ToolResultView({ result, isStartExpanded }: ToolResultViewProps) {
               e.currentTarget.style.display = 'none';
             }}
           />
+        )}
+        {result.type === 'resource' && (
+          <div className="bg-gray-50 p-3 rounded border">
+            <p className="text-sm text-gray-600 mb-2">
+              <strong>Resource:</strong> {result.resource.uri}
+            </p>
+            {result.resource && 'text' in result.resource && (
+              <pre className="text-xs bg-white p-2 rounded border max-h-40 overflow-auto">
+                {result.resource.text}
+              </pre>
+            )}
+          </div>
         )}
       </div>
     </ToolCallExpandable>
