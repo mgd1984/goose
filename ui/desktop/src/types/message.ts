@@ -18,7 +18,29 @@ export interface ImageContent {
   annotations?: Record<string, unknown>;
 }
 
-export type Content = TextContent | ImageContent;
+// Resource contents - matches ResourceContents enum from backend
+export interface TextResourceContents {
+  uri: string;
+  mime_type?: string;
+  text: string;
+}
+
+export interface BlobResourceContents {
+  uri: string;
+  mime_type?: string;
+  blob: string;
+}
+
+export type ResourceContents = TextResourceContents | BlobResourceContents;
+
+// EmbeddedResource - matches backend structure exactly
+export interface ResourceContent {
+  type: 'resource';
+  resource: ResourceContents;
+  annotations?: Record<string, unknown>;
+}
+
+export type Content = TextContent | ImageContent | ResourceContent;
 
 export interface ToolCall {
   name: string;
@@ -233,4 +255,14 @@ export function hasCompletedToolCalls(message: Message): boolean {
   // In a real implementation, you'd need to check if all tool requests have responses
   // by looking through subsequent messages
   return true;
+}
+
+// Helper functions for resource content
+export function isTextResource(resource: ResourceContents): resource is TextResourceContents {
+  return 'text' in resource && typeof (resource as TextResourceContents).text === 'string';
+}
+
+// Safe helper to extract text from ResourceContents
+export function getResourceText(resource: ResourceContents): string | null {
+  return isTextResource(resource) ? resource.text : null;
 }
