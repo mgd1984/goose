@@ -1,6 +1,9 @@
 import React from 'react';
+import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
+import { Button } from './ui/button';
+import { Badge } from './ui/badge';
 
-// Goose-specific React components for Remote DOM rendering
+// Goose-specific React components for Remote DOM rendering using shadcn/ui
 // These components correspond to the semantic elements sent by your server
 
 interface ProductCardProps {
@@ -33,35 +36,48 @@ const ProductCard: React.FC<ProductCardProps> = ({
   };
 
   return (
-    <div 
-      className={`border rounded-lg p-4 bg-white shadow-sm ${
-        interactive === 'true' ? 'cursor-pointer hover:shadow-md transition-shadow' : ''
+    <Card 
+      className={`transition-all duration-200 ${
+        interactive === 'true' ? 'cursor-pointer hover:shadow-default' : ''
       }`}
       onClick={handleClick}
     >
       {imageUrl && (
-        <img 
-          src={imageUrl} 
-          alt={name || 'Product'} 
-          className="w-full h-32 object-cover rounded mb-3"
-        />
+        <div className="p-4 pb-0">
+          <img 
+            src={imageUrl} 
+            alt={name || 'Product'} 
+            className="w-full h-32 object-cover rounded"
+          />
+        </div>
       )}
-      <div className="space-y-2">
-        {name && <h3 className="font-semibold text-lg text-gray-900">{name}</h3>}
-        {sku && <p className="text-sm text-gray-500">SKU: {sku}</p>}
-        {price && (
-          <p className="text-lg font-bold text-green-600">
-            {currency} {price}
-          </p>
-        )}
-        {category && (
-          <span className="inline-block px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">
-            {category}
-          </span>
-        )}
-        {description && <p className="text-sm text-gray-600">{description}</p>}
-      </div>
-    </div>
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center justify-between">
+          <span className="text-lg">{name || 'Product'}</span>
+          {price && (
+            <span className="text-lg font-bold text-green-600">
+              {currency} {price}
+            </span>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <div className="space-y-2">
+          {sku && <p className="text-sm text-text-muted">SKU: {sku}</p>}
+          {category && (
+            <Badge variant="secondary" className="text-xs">
+              {category}
+            </Badge>
+          )}
+          {description && <p className="text-sm text-text-muted">{description}</p>}
+          {interactive === 'true' && (
+            <Button size="sm" variant="outline" className="mt-2">
+              View Details
+            </Button>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 
@@ -79,18 +95,20 @@ const ProductCatalog: React.FC<ProductCatalogProps> = ({
   children,
 }) => {
   return (
-    <div className="p-6 bg-gray-50 rounded-lg">
-      <div className="mb-6">
-        {title && <h1 className="text-2xl font-bold text-gray-900 mb-2">{title}</h1>}
-        {subtitle && <p className="text-gray-600">{subtitle}</p>}
+    <Card>
+      <CardHeader>
+        {title && <CardTitle className="text-2xl">{title}</CardTitle>}
+        {subtitle && <p className="text-text-muted">{subtitle}</p>}
         {interactive === 'true' && (
-          <p className="text-sm text-blue-600 mt-2">Interactive catalog - click items to interact</p>
+          <p className="text-sm text-text-accent mt-2">Interactive catalog - click items to interact</p>
         )}
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {children}
-      </div>
-    </div>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {children}
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 
@@ -108,20 +126,26 @@ const PricingCalculator: React.FC<PricingCalculatorProps> = ({
   children,
 }) => {
   return (
-    <div className="p-4 bg-white border rounded-lg shadow-sm">
-      {title && <h2 className="text-lg font-semibold mb-4 text-gray-900">{title}</h2>}
-      <div className="space-y-2">
-        {children}
-      </div>
-      {total && (
-        <div className="mt-4 pt-4 border-t border-gray-200">
-          <div className="flex justify-between items-center font-bold text-lg">
-            <span>Total:</span>
-            <span className="text-green-600">{currency} {total}</span>
-          </div>
-        </div>
+    <Card>
+      {title && (
+        <CardHeader>
+          <CardTitle className="text-lg">{title}</CardTitle>
+        </CardHeader>
       )}
-    </div>
+      <CardContent>
+        <div className="space-y-2">
+          {children}
+        </div>
+        {total && (
+          <div className="mt-4 pt-4 border-t border-borderSubtle">
+            <div className="flex justify-between items-center font-bold text-lg">
+              <span>Total:</span>
+              <span className="text-green-600">{currency} {total}</span>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 };
 
@@ -138,7 +162,7 @@ const CostItem: React.FC<CostItemProps> = ({
 }) => {
   return (
     <div className="flex justify-between items-center py-1">
-      <span className="text-gray-700">{label}</span>
+      <span className="text-text-default">{label}</span>
       <span className="font-medium">{currency} {amount}</span>
     </div>
   );
@@ -180,7 +204,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
         </div>
       )}
       {total && (
-        <div className="flex justify-between font-bold text-lg pt-2 border-t">
+        <div className="flex justify-between font-bold text-lg pt-2 border-t border-borderSubtle">
           <span>Total:</span>
           <span className="text-green-600">{currency} {total}</span>
         </div>
@@ -201,13 +225,17 @@ const DesignPreview: React.FC<DesignPreviewProps> = ({
   children,
 }) => {
   return (
-    <div className="p-4 bg-white border rounded-lg">
-      {title && <h2 className="text-lg font-semibold mb-2">{title}</h2>}
-      {description && <p className="text-gray-600 mb-4">{description}</p>}
-      <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-        {children || <span className="text-gray-500">Design preview placeholder</span>}
-      </div>
-    </div>
+    <Card>
+      <CardHeader>
+        {title && <CardTitle className="text-lg">{title}</CardTitle>}
+        {description && <p className="text-text-muted">{description}</p>}
+      </CardHeader>
+      <CardContent>
+        <div className="border-2 border-dashed border-borderSubtle rounded-lg p-8 text-center">
+          {children || <span className="text-text-muted">Design preview placeholder</span>}
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 
@@ -219,7 +247,7 @@ const PreviewPlaceholder: React.FC<PreviewPlaceholderProps> = ({
   text,
 }) => {
   return (
-    <div className="text-gray-500 italic">
+    <div className="text-text-muted italic">
       {text || 'Preview will be generated...'}
     </div>
   );
@@ -237,11 +265,15 @@ const OrderFlow: React.FC<OrderFlowProps> = ({
   children,
 }) => {
   return (
-    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-      {title && <h2 className="text-lg font-semibold mb-2 text-blue-900">{title}</h2>}
-      {step && <p className="text-sm text-blue-700 mb-4">Current step: {step}</p>}
-      <div>{children}</div>
-    </div>
+    <Card className="bg-blue-50 border-blue-200">
+      <CardHeader>
+        {title && <CardTitle className="text-lg text-blue-900">{title}</CardTitle>}
+        {step && <p className="text-sm text-blue-700">Current step: {step}</p>}
+      </CardHeader>
+      <CardContent>
+        <div>{children}</div>
+      </CardContent>
+    </Card>
   );
 };
 
@@ -253,7 +285,7 @@ const FlowPlaceholder: React.FC<FlowPlaceholderProps> = ({
   message,
 }) => {
   return (
-    <div className="text-blue-600 italic">
+    <div className="text-text-accent italic">
       {message || 'Order flow will be displayed here...'}
     </div>
   );
