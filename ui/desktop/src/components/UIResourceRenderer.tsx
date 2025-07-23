@@ -4,6 +4,7 @@ import { UIResourceRenderer as MCPUIResourceRenderer } from '@mcp-ui/client';
 import type { Resource } from '@modelcontextprotocol/sdk/types.js';
 import type { UIActionResult } from '@mcp-ui/client';
 import { Content, ResourceContents } from '../types/message';
+import { gooseComponentLibrary } from './GooseComponentLibrary';
 
 interface UIResourceRendererProps {
   resource: UIResource;
@@ -125,6 +126,9 @@ export const UIResourceRenderer: React.FC<UIResourceRendererProps> = ({
           supportedContentTypes={['rawHtml', 'externalUrl', 'remoteDom']}
           htmlProps={{
             style: { width: '100%', minHeight: '300px', border: 'none' }
+          }}
+          remoteDomProps={{
+            library: gooseComponentLibrary as any,
           }}
         />
       </div>
