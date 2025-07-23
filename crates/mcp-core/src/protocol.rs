@@ -171,6 +171,8 @@ pub struct ServerCapabilities {
     pub resources: Option<ResourcesCapability>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tools: Option<ToolsCapability>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ui: Option<UICapabilities>,
     // Add other capabilities as needed
 }
 
@@ -191,6 +193,17 @@ pub struct ResourcesCapability {
 #[serde(rename_all = "camelCase")]
 pub struct ToolsCapability {
     pub list_changed: Option<bool>,
+}
+
+/// UI capabilities for MCP-UI support
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct UICapabilities {
+    /// Whether the server supports UI resources
+    pub supports_ui: bool,
+    /// Supported UI formats (e.g., "text/html", "application/vnd.mcp-ui.remote-dom+javascript")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub supported_formats: Option<Vec<String>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]

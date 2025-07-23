@@ -69,6 +69,13 @@ pub struct ClientInfo {
 #[derive(Serialize, Deserialize, Default)]
 pub struct ClientCapabilities {
     // Add fields as needed. For now, empty capabilities are fine.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ui: Option<UIClientCapabilities>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct UIClientCapabilities {
+    pub supports_ui: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -98,6 +105,8 @@ pub trait McpClientTrait: Send + Sync {
     async fn list_tools(&self, next_cursor: Option<String>) -> Result<ListToolsResult, Error>;
 
     async fn call_tool(&self, name: &str, arguments: Value) -> Result<CallToolResult, Error>;
+
+    async fn call_tool_with_ui(&self, name: &str, arguments: Value) -> Result<CallToolResult, Error>;
 
     async fn list_prompts(&self, next_cursor: Option<String>) -> Result<ListPromptsResult, Error>;
 
@@ -390,6 +399,12 @@ where
         // TODO ERROR: check that if there is an error, we send back is_error: true with msg
         // https://modelcontextprotocol.io/docs/concepts/tools#error-handling-2
         self.send_request("tools/call", params).await
+    }
+
+    async fn call_tool_with_ui(&self, name: &str, arguments: Value) -> Result<CallToolResult, Error> {
+        // For Phase 1, call_tool_with_ui is the same as call_tool but includes UI capability headers
+        // In future phases, this could include additional UI-specific metadata
+        self.call_tool(name, arguments).await
     }
 
     async fn list_prompts(&self, next_cursor: Option<String>) -> Result<ListPromptsResult, Error> {
