@@ -1,245 +1,272 @@
 /// <reference lib="dom" />
-import { UIResourceRenderer as McpUIResourceRenderer } from '@mcp-ui/client';
-import { Content, getResourceText } from '../types/message';
 import React from 'react';
-
-// Resource interface compatible with @mcp-ui/client
-export interface Resource {
-  uri: string;
-  mimeType: string;
-  text?: string;
-  blob?: string;
-  name?: string;
-  title?: string;
-  description?: string;
-  _meta?: { [x: string]: unknown };
-  [x: string]: unknown; // Index signature for compatibility
-}
+import { UIResourceRenderer as MCPUIResourceRenderer } from '@mcp-ui/client';
+import type { Resource } from '@modelcontextprotocol/sdk/types.js';
+import type { UIActionResult } from '@mcp-ui/client';
+import { Content, ResourceContents } from '../types/message';
 
 interface UIResourceRendererProps {
-  resource: Resource;
-  onUIAction?: (action: any) => Promise<any>;
+  resource: UIResource;
   className?: string;
-  htmlProps?: {
-    style?: React.CSSProperties;
-    [key: string]: unknown;
-  };
-  remoteDomProps?: {
-    [key: string]: unknown;
-  };
+  onUIAction?: (action: any) => Promise<any>;
 }
 
-export function UIResourceRenderer({
-  resource,
-  onUIAction,
-  className = '',
-  htmlProps,
-  remoteDomProps,
-}: UIResourceRendererProps) {
-  console.log('=== UIResourceRenderer called ===');
-  console.log('Raw resource object:', resource);
-  console.log('Resource type:', typeof resource);
-  console.log('Resource keys:', Object.keys(resource || {}));
-  console.log('Resource.uri:', resource?.uri);
-  console.log('Resource.mimeType:', resource?.mimeType);
+interface UIResource {
+  uri: string;
+  mimeType: string;
+  text: string;
+  name: string;
+  title: string;
+  description: string;
+}
 
-  // Validate resource according to mcp-ui spec
-  const mimeType = resource.mimeType;
-  const mimeTypeString = String(mimeType || 'unknown');
-
-  if (!resource.uri || !mimeType) {
-    console.error('❌ Invalid UI resource: missing uri or mimeType', {
-      hasUri: !!resource.uri,
-      uri: resource.uri,
-      hasMimeType: !!mimeType,
-      mimeType: mimeType,
-      resourceKeys: Object.keys(resource || {}),
-    });
-    return <div className="text-red-500">Invalid UI resource: missing uri or mimeType</div>;
+// Error boundary for catching MCP-UI rendering errors
+class MCPUIErrorBoundary extends React.Component<
+  { children: React.ReactNode; fallback: React.ReactNode },
+  { hasError: boolean; error?: Error }
+> {
+  constructor(props: { children: React.ReactNode; fallback: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
   }
 
-  console.log('✅ Valid UI resource detected:', {
-    uri: resource.uri,
-    mimeType: mimeTypeString,
-    hasText: !!resource.text,
-    hasBlob: !!resource.blob,
-  });
+  static getDerivedStateFromError(error: Error) {
+    console.error('🚨 MCP-UI Error Boundary caught error:', error);
+    return { hasError: true, error };
+  }
 
-  // Handle UI actions from the rendered component
-  const handleUIAction = async (action: any): Promise<any> => {
-    console.log('🎯 UI Action received:', action);
-    
-    try {
-      if (onUIAction) {
-        const result = await onUIAction(action);
-        console.log('✅ UI Action handled:', result);
-        return result;
-      }
-      
-      console.log('⚠️ No onUIAction handler provided');
-      return { status: 'handled' };
-    } catch (error) {
-      console.error('❌ Error handling UI action:', error);
-      return { status: 'error', error: String(error) };
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('🚨 MCP-UI Error Boundary details:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      console.log('🔄 MCP-UI Error Boundary rendering fallback');
+      return this.props.fallback;
     }
+
+    return this.props.children;
+  }
+}
+
+// Real MCP-UI renderer using the actual @mcp-ui/client library
+export const UIResourceRenderer: React.FC<UIResourceRendererProps> = ({ 
+  resource, 
+  className = '',
+  onUIAction 
+}) => {
+  console.log('🎯 UIResourceRenderer rendering with:', resource);
+
+  if (!resource) {
+    console.log('❌ No resource provided to UIResourceRenderer');
+    return <div className={`p-4 text-gray-500 ${className}`}>No UI resource available</div>;
+  }
+
+  // Handle UI actions - use the correct UIActionResult type
+  const handleUIAction = async (result: UIActionResult): Promise<unknown> => {
+    console.log('🎯 UI Action received from MCP-UI client:', result);
+    if (onUIAction) {
+      return await onUIAction(result);
+    }
+    return undefined;
   };
 
-  return (
-    <div className={`mcp-ui-resource-renderer ${className}`}>
-      <McpUIResourceRenderer
-        resource={resource}
-        onUIAction={handleUIAction}
-        htmlProps={{
-          style: {
-            border: '1px solid #e2e8f0',
-            borderRadius: '8px',
-            minHeight: '200px',
-            backgroundColor: '#ffffff',
-            ...htmlProps?.style,
-          },
-          ...htmlProps,
-        }}
-        remoteDomProps={remoteDomProps}
-      />
+  // Convert our resource format to the official MCP SDK Resource format
+  const mcpResource: Partial<Resource> = {
+    uri: resource.uri,
+    mimeType: resource.mimeType,
+    text: resource.text
+  };
+
+  console.log('🔄 Converted MCP resource for @mcp-ui/client:', mcpResource);
+
+  // Create the fallback component
+  const fallbackRenderer = (
+    <div className={`${className} border rounded-lg p-4`}>
+      <div className="text-sm text-gray-600 mb-2">
+        UI Resource (MCP-UI failed - using fallback)
+      </div>
+      <div className="border rounded bg-gray-50 p-2" style={{ minHeight: '300px' }}>
+        {resource.mimeType === 'text/html' ? (
+          <iframe
+            srcDoc={resource.text}
+            className="w-full border-0"
+            title={resource.name || 'UI Resource'}
+            sandbox="allow-scripts allow-same-origin allow-forms"
+            style={{ height: '400px', width: '100%' }}
+          />
+        ) : (
+          <pre className="text-xs whitespace-pre-wrap">
+            {resource.text.substring(0, 1000)}
+            {resource.text.length > 1000 && '...'}
+          </pre>
+        )}
+      </div>
     </div>
   );
-}
 
-export function isUIResource(content: Content): boolean {
-  console.log('🔍 Checking if content is UI resource:', content.type);
+  console.log('🔄 Attempting to render with @mcp-ui/client...');
+  
+  // TEMPORARY: Force fallback to test iframe rendering
+  console.log('🚨 FORCING FALLBACK for testing...');
+  return fallbackRenderer;
+  
+  return (
+    <MCPUIErrorBoundary fallback={fallbackRenderer}>
+      <div className={className} style={{ width: '100%', minHeight: '300px' }}>
+        <MCPUIResourceRenderer
+          resource={mcpResource}
+          onUIAction={handleUIAction}
+          supportedContentTypes={['rawHtml', 'externalUrl', 'remoteDom']}
+          htmlProps={{
+            style: { width: '100%', minHeight: '300px', border: 'none' }
+          }}
+        />
+      </div>
+    </MCPUIErrorBoundary>
+  );
+};
 
-  // Check if it's a resource content type first
-  if (content.type === 'resource') {
-    const resource = content.resource;
-    console.log('Found resource content, checking URI and mimeType:', {
-      uri: resource.uri,
-      mimeType: 'mime_type' in resource ? resource.mime_type : 'unknown',
-    });
-
-    // Check if it's a valid UI resource according to mcp-ui spec
-    if (
-      resource.uri &&
-      resource.uri.startsWith('ui://') &&
-      ('mime_type' in resource && (
-        resource.mime_type === 'text/html' ||
-        resource.mime_type === 'text/uri-list' ||
-        resource.mime_type?.startsWith('application/vnd.mcp-ui.')
-      ))
-    ) {
-      console.log('✅ Valid UI resource found');
-      return true;
-    }
+// Wrapper function to check if Content contains a UI resource
+export function isContentUIResource(content: Content): boolean {
+  console.log('🔍 isContentUIResource checking:', content);
+  
+  if (content.type === 'resource' && content.resource) {
+    return isUIResource(content.resource);
   }
-
-  // Handle text type content that might contain embedded UI resource (legacy fallback)
+  
+  // For backwards compatibility, also check text content for HTML
   if (content.type === 'text' && content.text) {
-    console.log('Checking text content for embedded UI resource');
-    try {
-      // Try to parse the text as JSON to see if it's a resource object
-      const parsed = JSON.parse(content.text);
-      
-      // Check for Goose internal format in JSON
-      if (
-        parsed &&
-        typeof parsed === 'object' &&
-        parsed.uri?.startsWith('ui://') &&
-        parsed.mimeType &&
-        (parsed.mimeType === 'text/html' ||
-          parsed.mimeType === 'text/uri-list' ||
-          parsed.mimeType.startsWith('application/vnd.mcp-ui.'))
-      ) {
-        console.log('Found valid UI resource in JSON text');
-        return true;
-      }
-    } catch {
-      // Not valid JSON, check for text patterns
-      const hasUIPattern =
-        content.text.includes('ui://') &&
-        (content.text.includes('text/html') ||
-          content.text.includes('text/uri-list') ||
-          content.text.includes('application/vnd.mcp-ui.'));
-      if (hasUIPattern) {
-        console.log('Found UI resource pattern in text');
-        return true;
-      }
-    }
+    const text = content.text.toLowerCase().trim();
+    const hasHTMLContent = text.includes('<html') || 
+                          text.includes('<!doctype') ||
+                          (text.includes('<div') && text.includes('</div>')) ||
+                          (text.includes('<h1') || text.includes('<h2') || text.includes('<h3')) ||
+                          text.includes('<script') ||
+                          text.includes('<style');
+    return hasHTMLContent;
   }
-
-  console.log('❌ Not a UI resource');
+  
   return false;
 }
 
-export function extractUIResource(content: Content): Resource | null {
-  console.log('🔍 Attempting to extract UI resource from content:', content.type);
+export function isUIResource(resource: ResourceContents): boolean {
+  console.log('🔍 isUIResource checking:', resource);
+  
+  // Check MIME type (both formats)
+  const mimeType = resource.mime_type || (resource as any).mimeType;
+  console.log('🎯 MIME type found:', mimeType);
+  
+  const hasValidMimeType = Boolean(
+    mimeType &&
+    typeof mimeType === 'string' &&
+    (mimeType.includes('text/html') ||
+     mimeType === 'text/html' ||
+     mimeType.startsWith('application/vnd.mcp-ui') ||
+     mimeType === 'text/uri-list')
+  );
+  
+  // Check URI patterns for UI resources
+  const hasUIUri = Boolean(
+    resource.uri &&
+    (resource.uri.startsWith('ui://') ||
+     resource.uri.includes('/ui/') ||
+     resource.uri.includes('html') ||
+     resource.uri.includes('interactive') ||
+     resource.uri.includes('phantasm')) // Specific for your MCP server
+  );
+  
+  // Check content for HTML-like patterns (for text resources only)
+  let hasHTMLContent = false;
+  if ('text' in resource && typeof resource.text === 'string') {
+    const text = resource.text.toLowerCase().trim();
+    hasHTMLContent = text.includes('<html') || 
+                    text.includes('<!doctype') ||
+                    (text.includes('<div') && text.includes('</div>')) ||
+                    (text.includes('<h1') || text.includes('<h2') || text.includes('<h3')) ||
+                    text.includes('<script') ||
+                    text.includes('<style');
+  }
+  
+  console.log('🔍 UI Resource Detection:', {
+    mimeType,
+    hasValidMimeType,
+    hasUIUri,
+    hasHTMLContent,
+    uri: resource.uri
+  });
+  
+  // Return true if ANY of these conditions are met
+  const isUI = hasValidMimeType || hasUIUri || hasHTMLContent;
+  console.log('✅ Final UI detection result:', isUI);
+  
+  return isUI;
+}
 
-  // Check if it's a resource content type first
-  if (content.type === 'resource') {
+export function extractUIResource(content: Content): UIResource | null {
+  console.log('🔍 extractUIResource called with:', content);
+  
+  // Handle resource content
+  if (content.type === 'resource' && content.resource) {
     const resource = content.resource;
-    console.log('Found resource content:', {
-      uri: resource.uri,
-      hasText: 'text' in resource,
-      hasBlob: 'blob' in resource,
-      mimeType: 'mime_type' in resource ? resource.mime_type : 'unknown',
-    });
+    console.log('🔍 Found resource:', resource);
+    
+    const textContent = getResourceText(resource);
+    const originalMimeType = resource.mime_type || (resource as any).mimeType;
 
-    // Check if it's a valid UI resource according to mcp-ui spec (Goose internal format)
-    if (isUIResource(content)) {
-      // Safely extract text content from resource using type-safe helper
-      const textContent = getResourceText(resource);
-      const blobContent = 'blob' in resource ? resource.blob : undefined;
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const mimeType = (resource as any).mimeType || resource.mime_type;
-
-      if (!resource.uri || !mimeType) {
-        console.error('Resource missing required fields:', { uri: resource.uri, mimeType });
-        return null;
-      }
-
-      const extractedResource: Resource = {
+    if (textContent) {
+      console.log('🔍 Extracting text content:', textContent.substring(0, 100) + '...');
+      
+      // Convert to UI Resource format
+      const extractedResource: UIResource = {
         uri: resource.uri,
-        mimeType: mimeType,
-        ...(textContent && { text: textContent }),
-        ...(blobContent && { blob: blobContent }),
+        mimeType: originalMimeType || 'text/html',
+        text: textContent,
+        name: 'UI Resource',
+        title: 'UI Resource',
+        description: 'Interactive UI component',
       };
-
-      console.log('Successfully extracted resource:', extractedResource);
+      
+      console.log('✅ Successfully extracted UI resource:', extractedResource);
+      return extractedResource;
+    }
+  }
+  
+  // Handle text content with HTML (backwards compatibility)
+  if (content.type === 'text' && content.text) {
+    const text = content.text.toLowerCase().trim();
+    const hasHTMLContent = text.includes('<html') || 
+                          text.includes('<!doctype') ||
+                          (text.includes('<div') && text.includes('</div>')) ||
+                          (text.includes('<h1') || text.includes('<h2') || text.includes('<h3')) ||
+                          text.includes('<script') ||
+                          text.includes('<style');
+    
+    if (hasHTMLContent) {
+      console.log('🔍 Extracting HTML from text content');
+      
+      const extractedResource: UIResource = {
+        uri: 'ui://goose/inline-html',
+        mimeType: 'text/html',
+        text: content.text,
+        name: 'Inline HTML',
+        title: 'Inline HTML',
+        description: 'HTML content detected in text response',
+      };
+      
+      console.log('✅ Successfully extracted HTML from text:', extractedResource);
       return extractedResource;
     }
   }
 
-  // Handle text type content that might contain embedded UI resource (legacy fallback)
-  if (content.type === 'text' && content.text) {
-    console.log('Checking text content for embedded UI resource');
-    try {
-      // Try to parse the text as JSON to see if it's a resource object
-      const parsed = JSON.parse(content.text);
-      
-      // Check for Goose internal format in JSON
-      if (
-        parsed &&
-        typeof parsed === 'object' &&
-        parsed.uri?.startsWith('ui://') &&
-        parsed.mimeType &&
-        (parsed.mimeType === 'text/html' ||
-          parsed.mimeType === 'text/uri-list' ||
-          parsed.mimeType.startsWith('application/vnd.mcp-ui.'))
-      ) {
-        console.log('Successfully extracted resource from JSON text:', parsed);
-        const extractedResource: Resource = {
-          uri: parsed.uri,
-          mimeType: parsed.mimeType,
-          ...(parsed.text && { text: parsed.text }),
-          ...(parsed.blob && { blob: parsed.blob }),
-        };
-        return extractedResource;
-      }
-    } catch {
-      // Not valid JSON, skip
-      console.log('Text content is not valid JSON, cannot extract resource');
-    }
-  }
+  console.log('❌ No UI resource found in content');
+  return null;
+}
 
-  console.log('❌ No valid UI resource found');
+// Safe helper to extract text from ResourceContents
+function getResourceText(resource: ResourceContents): string | null {
+  if ('text' in resource && typeof resource.text === 'string') {
+    return resource.text;
+  }
   return null;
 } 
