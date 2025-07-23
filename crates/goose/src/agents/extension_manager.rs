@@ -35,6 +35,8 @@ pub struct ExtensionManager {
     clients: HashMap<String, McpClientBox>,
     instructions: HashMap<String, String>,
     resource_capable_extensions: HashSet<String>,
+    /// Extensions that support UI resources
+    ui_capable_extensions: HashSet<String>,
 }
 
 /// A flattened representation of a resource used by the agent to prepare inference
@@ -105,11 +107,22 @@ impl ExtensionManager {
             clients: HashMap::new(),
             instructions: HashMap::new(),
             resource_capable_extensions: HashSet::new(),
+            ui_capable_extensions: HashSet::new(),
         }
     }
 
     pub fn supports_resources(&self) -> bool {
         !self.resource_capable_extensions.is_empty()
+    }
+
+    /// Check if any extensions support UI resources
+    pub fn supports_ui(&self) -> bool {
+        !self.ui_capable_extensions.is_empty()
+    }
+
+    /// Check if a specific extension supports UI resources
+    pub fn extension_supports_ui(&self, extension_name: &str) -> bool {
+        self.ui_capable_extensions.contains(extension_name)
     }
 
     /// Add a new MCP extension based on the provided client type
@@ -269,12 +282,16 @@ impl ExtensionManager {
             _ => unreachable!(),
         };
 
-        // Initialize the client with default capabilities
+        // Initialize the client with UI capabilities
         let info = ClientInfo {
             name: "goose".to_string(),
             version: env!("CARGO_PKG_VERSION").to_string(),
         };
-        let capabilities = ClientCapabilities::default();
+        let capabilities = ClientCapabilities {
+            ui: Some(mcp_client::client::UIClientCapabilities {
+                supports_ui: true,
+            }),
+        };
 
         let init_result = client
             .initialize(info, capabilities)
@@ -289,6 +306,14 @@ impl ExtensionManager {
         if init_result.capabilities.resources.is_some() {
             self.resource_capable_extensions
                 .insert(sanitized_name.clone());
+        }
+
+        // Check if server supports UI resources
+        if let Some(ui_caps) = &init_result.capabilities.ui {
+            if ui_caps.supports_ui {
+                self.ui_capable_extensions
+                    .insert(sanitized_name.clone());
+            }
         }
 
         self.clients
@@ -316,6 +341,7 @@ impl ExtensionManager {
         self.clients.remove(&sanitized_name);
         self.instructions.remove(&sanitized_name);
         self.resource_capable_extensions.remove(&sanitized_name);
+        self.ui_capable_extensions.remove(&sanitized_name);
         Ok(())
     }
 
@@ -657,13 +683,25 @@ impl ExtensionManager {
         let arguments = tool_call.arguments.clone();
         let client = client.clone();
         let notifications_receiver = client.lock().await.subscribe().await;
+        
+        // Check if this extension supports UI resources
+        let supports_ui = self.extension_supports_ui(client_name);
 
         let fut = async move {
             let client_guard = client.lock().await;
-            client_guard
-                .call_tool(&tool_name, arguments)
-                .await
-                .map(|call| call.content)
+            
+            // Use UI-aware tool calling if the extension supports UI
+            let result = if supports_ui {
+                client_guard.call_tool_with_ui(&tool_name, arguments).await
+            } else {
+                client_guard.call_tool(&tool_name, arguments).await
+            };
+            
+            result
+                .map(|call| {
+                    // Post-process content to detect UI resources that were returned as text
+                    Self::process_potential_ui_content(call.content)
+                })
                 .map_err(|e| ToolError::ExecutionError(e.to_string()))
         };
 
@@ -823,6 +861,121 @@ impl ExtensionManager {
 
         Ok(vec![Content::text(output_parts.join("\n"))])
     }
+
+    /// Process tool response content to detect UI resources that were incorrectly returned as text
+    fn process_potential_ui_content(content: Vec<Content>) -> Vec<Content> {
+        content.into_iter().map(|item| {
+            // Check if this is text content that might contain UI resources
+            match &item.raw {
+                rmcp::model::RawContent::Text(text_content) => {
+                    // Check if this text content looks like a UI resource
+                    if Self::looks_like_ui_resource(&text_content.text) {
+                        // Convert to proper resource structure
+                        Self::convert_text_to_ui_resource(text_content)
+                    } else {
+                        item
+                    }
+                },
+                rmcp::model::RawContent::Resource(resource_content) => {
+                    // Check if this is already a resource but missing proper UI MIME type
+                    if Self::is_ui_resource_by_uri(&Self::get_resource_uri(&resource_content.resource)) {
+                        // Ensure proper MIME type is set for UI resources
+                        Self::ensure_ui_resource_mime_type(item.clone(), resource_content)
+                    } else {
+                        item
+                    }
+                },
+                _ => item
+            }
+        }).collect()
+    }
+
+    /// Check if text content appears to be a UI resource based on patterns
+    fn looks_like_ui_resource(text: &str) -> bool {
+        text.contains("<!DOCTYPE html>") ||
+        text.contains("<html") ||
+        text.contains("Remote DOM") ||
+        text.contains("mcp-ui") ||
+        text.contains("interactive-ui") ||
+        text.trim().starts_with('<') && text.trim().ends_with('>')
+    }
+
+    /// Check if URI indicates this is a UI resource
+    fn is_ui_resource_by_uri(uri: &str) -> bool {
+        uri.starts_with("ui://") ||
+        uri.contains("/ui/") ||
+        uri.contains("html") ||
+        uri.contains("interactive") ||
+        uri.contains("phantasm") // Specific for your MCP server
+    }
+
+    /// Helper to get the URI from a resource content
+    fn get_resource_uri(resource_content: &rmcp::model::ResourceContents) -> &str {
+        match resource_content {
+            rmcp::model::ResourceContents::TextResourceContents { uri, .. } => uri,
+            rmcp::model::ResourceContents::BlobResourceContents { uri, .. } => uri,
+        }
+    }
+
+    /// Ensure UI resource has proper MIME type
+    fn ensure_ui_resource_mime_type(
+        original_content: Content, 
+        resource_content: &rmcp::model::RawEmbeddedResource
+    ) -> Content {
+        use rmcp::model::ResourceContents;
+
+        // Check if MIME type is already set appropriately
+        let current_mime_type = match &resource_content.resource {
+            ResourceContents::TextResourceContents { mime_type, .. } => mime_type.as_ref(),
+            ResourceContents::BlobResourceContents { mime_type, .. } => mime_type.as_ref(),
+        };
+
+        // If already has a UI-appropriate MIME type, return as-is
+        if let Some(mime_type) = current_mime_type {
+            if mime_type == "text/html" || mime_type.starts_with("application/vnd.mcp-ui") {
+                return original_content;
+            }
+        }
+
+        // Otherwise, create a new resource with proper MIME type
+        match &resource_content.resource {
+            ResourceContents::TextResourceContents { uri, text, .. } => {
+                Content::resource(ResourceContents::TextResourceContents {
+                    uri: uri.clone(),
+                    mime_type: Some("text/html".to_string()),
+                    text: text.clone(),
+                })
+            },
+            ResourceContents::BlobResourceContents { uri, blob, .. } => {
+                Content::resource(ResourceContents::BlobResourceContents {
+                    uri: uri.clone(),
+                    mime_type: Some("text/html".to_string()),
+                    blob: blob.clone(),
+                })
+            },
+        }
+    }
+
+    /// Convert text content to proper UI resource structure
+    fn convert_text_to_ui_resource(text_content: &rmcp::model::RawTextContent) -> Content {
+        use rmcp::model::ResourceContents;
+
+        // Try to extract UI information from the text
+        let (uri, mime_type) = if text_content.text.contains("Remote DOM") {
+            ("ui://mcp-server/dynamic-ui/response".to_string(), "application/vnd.mcp-ui.remote-dom+javascript".to_string())
+        } else if text_content.text.contains("<!DOCTYPE html>") {
+            ("ui://mcp-server/html-ui/response".to_string(), "text/html".to_string())
+        } else {
+            ("ui://mcp-server/interactive-content/response".to_string(), "text/html".to_string())
+        };
+
+        // Create proper resource structure
+        Content::resource(ResourceContents::TextResourceContents {
+            uri,
+            mime_type: Some(mime_type),
+            text: text_content.text.clone(),
+        })
+    }
 }
 
 #[cfg(test)]
@@ -872,6 +1025,11 @@ mod tests {
                 }),
                 _ => Err(Error::NotInitialized),
             }
+        }
+
+        async fn call_tool_with_ui(&self, name: &str, _arguments: Value) -> Result<CallToolResult, Error> {
+            // For the mock, just delegate to call_tool
+            self.call_tool(name, _arguments).await
         }
 
         async fn list_prompts(

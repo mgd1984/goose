@@ -13,7 +13,7 @@ use mcp_core::{
         CallToolResult, GetPromptResult, Implementation, InitializeResult, JsonRpcMessage,
         JsonRpcRequest, JsonRpcResponse, ListPromptsResult, ListResourcesResult, ListToolsResult,
         PromptsCapability, ReadResourceResult, ResourcesCapability, ServerCapabilities,
-        ToolsCapability,
+        ToolsCapability, UICapabilities,
     },
     ResourceContents,
 };
@@ -29,6 +29,7 @@ pub struct CapabilitiesBuilder {
     tools: Option<ToolsCapability>,
     prompts: Option<PromptsCapability>,
     resources: Option<ResourcesCapability>,
+    ui: Option<UICapabilities>,
 }
 
 impl Default for CapabilitiesBuilder {
@@ -43,6 +44,7 @@ impl CapabilitiesBuilder {
             tools: None,
             prompts: None,
             resources: None,
+            ui: None,
         }
     }
 
@@ -71,6 +73,15 @@ impl CapabilitiesBuilder {
         self
     }
 
+    /// Enable UI capabilities for MCP-UI support
+    pub fn with_ui(mut self, supports_ui: bool, supported_formats: Option<Vec<String>>) -> Self {
+        self.ui = Some(UICapabilities {
+            supports_ui,
+            supported_formats,
+        });
+        self
+    }
+
     /// Build the router with automatic capability inference
     pub fn build(self) -> ServerCapabilities {
         // Create capabilities based on what's configured
@@ -78,6 +89,7 @@ impl CapabilitiesBuilder {
             tools: self.tools,
             prompts: self.prompts,
             resources: self.resources,
+            ui: self.ui,
         }
     }
 }
