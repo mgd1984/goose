@@ -73,6 +73,8 @@ export interface ToolResponseMessageContent {
   type: 'toolResponse';
   id: string;
   toolResult: ToolCallResult<Content[]>;
+  /// Optional metadata for enhanced tool responses (e.g., Goose UI metadata)
+  _meta?: any;
 }
 
 export interface ToolConfirmationRequestMessageContent {
@@ -266,4 +268,44 @@ export function isTextResource(resource: ResourceContents): resource is TextReso
 // Safe helper to extract text from ResourceContents
 export function getResourceText(resource: ResourceContents): string | null {
   return isTextResource(resource) ? resource.text : null;
+}
+
+// Goose-specific metadata types from GitHub issue #3562
+export type Renderer = 'mcp-ui'; // day one
+
+export interface SidecarToolUI {
+  displayType: 'sidecar';
+  name: string;
+  renderer: Renderer;
+  trigger: {
+    label: string; // name to appear in tooltip
+    icon: string; // expects a valid Lucide icon name
+  };
+  actionBar?: {
+    actions: {
+      label: string; // name to appear in tooltip
+      icon: string; // expects a valid Lucide icon name
+      action: () => void; // action to send to configured renderer when triggered
+    }[];
+  };
+}
+
+export interface InlineToolUI {
+  displayType: 'inline';
+  name: string;
+  renderer: Renderer;
+}
+
+export type GooseToolUI = SidecarToolUI | InlineToolUI;
+
+export interface GooseMeta {
+  toolUI: GooseToolUI;
+  // ... potentially other metadata for future Goose experiences
+}
+
+export interface ToolResponseWithMeta {
+  _meta?: {
+    goose?: GooseMeta;
+  };
+  content: Content[];
 }

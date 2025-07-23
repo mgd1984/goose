@@ -300,9 +300,25 @@ impl SubAgent {
 
                             match tool_result {
                                 Ok(result) => {
-                                    // Create a user message with the tool response
-                                    let tool_response_message = Message::user()
-                                        .with_tool_response(request.id.clone(), Ok(result.clone()));
+                                    // Extract metadata from content annotations if present
+                                    let metadata = result
+                                        .first()
+                                        .and_then(|content| content.annotations.as_ref())
+                                        .and_then(|annotations| annotations.get("_meta"))
+                                        .cloned();
+
+                                    // Create a user message with the tool response (with metadata if present)
+                                    let tool_response_message = if metadata.is_some() {
+                                        Message::user().with_content(
+                                            MessageContent::tool_response_with_meta(
+                                                request.id.clone(),
+                                                Ok(result.clone()),
+                                                metadata,
+                                            ),
+                                        )
+                                    } else {
+                                        Message::user().with_tool_response(request.id.clone(), Ok(result.clone()))
+                                    };
                                     messages.push(tool_response_message);
 
                                     // Send notification about tool completion

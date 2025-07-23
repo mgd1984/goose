@@ -56,6 +56,9 @@ pub struct ToolResponse {
     #[serde(with = "tool_result_serde")]
     #[schema(value_type = Object)]
     pub tool_result: ToolResult<Vec<Content>>,
+    /// Optional metadata for enhanced tool responses (e.g., Goose UI metadata)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub _meta: Option<Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -140,6 +143,19 @@ impl MessageContent {
         MessageContent::ToolResponse(ToolResponse {
             id: id.into(),
             tool_result,
+            _meta: None,
+        })
+    }
+
+    pub fn tool_response_with_meta<S: Into<String>>(
+        id: S,
+        tool_result: ToolResult<Vec<Content>>,
+        meta: Option<Value>,
+    ) -> Self {
+        MessageContent::ToolResponse(ToolResponse {
+            id: id.into(),
+            tool_result,
+            _meta: meta,
         })
     }
 

@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Button } from './ui/button';
 import { ToolCallArguments, ToolCallArgumentValue } from './ToolCallArguments';
 import MarkdownContent from './MarkdownContent';
-import { Content, ResourceContents, ToolRequestMessageContent, ToolResponseMessageContent } from '../types/message';
+import { Content, ResourceContents, ToolRequestMessageContent, ToolResponseMessageContent, GooseMeta } from '../types/message';
 import { cn, snakeToTitleCase } from '../utils';
 import Dot, { LoadingStatus } from './ui/Dot';
 import { NotificationEvent } from '../hooks/useMessageStream';
@@ -18,6 +18,33 @@ interface ToolCallWithResponseProps {
   isStreamingMessage?: boolean;
 }
 
+// Helper function to extract Goose metadata from tool response
+function extractGooseMetadata(toolResponse?: ToolResponseMessageContent): GooseMeta | null {
+  if (!toolResponse?.toolResult?.value) return null;
+  
+  // Check if any of the response content contains _meta.goose
+  for (const content of toolResponse.toolResult.value) {
+    const annotations = content.annotations;
+    if (annotations && typeof annotations === 'object') {
+      // Check for _meta in annotations
+      const meta = (annotations as any)._meta;
+      if (meta && meta.goose) {
+        console.log('🎯 Found Goose metadata in tool response:', meta.goose);
+        return meta.goose as GooseMeta;
+      }
+    }
+  }
+  
+  // Also check if the tool response itself has metadata (backup approach)
+  const responseAny = toolResponse as any;
+  if (responseAny._meta?.goose) {
+    console.log('🎯 Found Goose metadata at response level:', responseAny._meta.goose);
+    return responseAny._meta.goose as GooseMeta;
+  }
+  
+  return null;
+}
+
 export default function ToolCallWithResponse({
   isCancelledMessage,
   toolRequest,
@@ -30,6 +57,11 @@ export default function ToolCallWithResponse({
     return null;
   }
 
+  // Extract Goose metadata for UI configuration
+  const gooseMeta = extractGooseMetadata(toolResponse);
+  
+  console.log('🔍 ToolCallWithResponse - Goose metadata:', gooseMeta);
+
   return (
     <div
       className={cn(
@@ -37,7 +69,7 @@ export default function ToolCallWithResponse({
       )}
     >
       <ToolCallView
-        {...{ isCancelledMessage, toolCall, toolResponse, notifications, isStreamingMessage }}
+        {...{ isCancelledMessage, toolCall, toolResponse, notifications, isStreamingMessage, gooseMeta }}
       />
     </div>
   );
@@ -94,6 +126,7 @@ interface ToolCallViewProps {
   toolResponse?: ToolResponseMessageContent;
   notifications?: NotificationEvent[];
   isStreamingMessage?: boolean;
+  gooseMeta?: GooseMeta | null;
 }
 
 interface Progress {
@@ -140,6 +173,7 @@ function ToolCallView({
   toolResponse,
   notifications,
   isStreamingMessage = false,
+  gooseMeta,
 }: ToolCallViewProps) {
   const [responseStyle, setResponseStyle] = useState(() => localStorage.getItem('response_style'));
 
@@ -194,7 +228,7 @@ function ToolCallView({
     }
   }, [toolResponse, startTime]);
 
-  const toolResults: { result: Content; isExpandToolResults: boolean }[] =
+  const toolResults: { result: Content; isExpandToolResults: boolean; gooseMeta?: GooseMeta | null }[] =
     loadingStatus === 'success' && Array.isArray(toolResponse?.toolResult.value)
       ? toolResponse!.toolResult.value
           .filter((item) => {
@@ -207,9 +241,14 @@ function ToolCallView({
             const isHighPriority = priority >= 0.5;
             const shouldExpandBasedOnStyle = responseStyle === 'detailed' || responseStyle === null;
 
+            // For inline UI resources with Goose metadata, always expand
+            const isInlineUI = gooseMeta?.toolUI?.displayType === 'inline' && isContentUIResource(item);
+            const shouldExpand = isHighPriority || shouldExpandBasedOnStyle || isInlineUI;
+
             return {
               result: item,
-              isExpandToolResults: isHighPriority || shouldExpandBasedOnStyle,
+              isExpandToolResults: shouldExpand,
+              gooseMeta, // Pass metadata to individual results
             };
           })
       : [];
@@ -472,10 +511,28 @@ function ToolCallView({
       {/* Tool Output */}
       {!isCancelledMessage && (
         <>
-          {toolResults.map(({ result, isExpandToolResults }, index) => {
+          {toolResults.map(({ result, isExpandToolResults, gooseMeta }, index) => {
+            // Check if this is an inline UI resource that should render without expandable wrapper
+            const isInlineUI = gooseMeta?.toolUI?.displayType === 'inline' && isContentUIResource(result);
+            
+            if (isInlineUI) {
+              // Render inline UI resources directly without expandable wrapper
+              return (
+                <div key={index} className={cn('border-t border-borderSubtle')}>
+                  <div className="w-full">
+                    <div className="pl-4 py-1 font-medium text-sm text-gray-600 border-b border-gray-200">
+                      {gooseMeta.toolUI.name || 'Interactive Output'}
+                    </div>
+                    <ToolResultView result={result} isStartExpanded={true} gooseMeta={gooseMeta} />
+                  </div>
+                </div>
+              );
+            }
+            
+            // Normal rendering for non-inline UI
             return (
               <div key={index} className={cn('border-t border-borderSubtle')}>
-                <ToolResultView result={result} isStartExpanded={isExpandToolResults} />
+                <ToolResultView result={result} isStartExpanded={isExpandToolResults} gooseMeta={gooseMeta} />
               </div>
             );
           })}
@@ -511,12 +568,14 @@ function ToolDetailsView({ toolCall, isStartExpanded }: ToolDetailsViewProps) {
 interface ToolResultViewProps {
   result: Content;
   isStartExpanded: boolean;
+  gooseMeta?: GooseMeta | null;
 }
 
-function ToolResultView({ result, isStartExpanded }: ToolResultViewProps) {
+function ToolResultView({ result, isStartExpanded, gooseMeta }: ToolResultViewProps) {
   console.log('🔍 ToolResultView checking result:', result);
   console.log('🔍 Result type:', result.type);
   console.log('🔍 Result keys:', Object.keys(result));
+  console.log('🔍 Received gooseMeta:', gooseMeta);
   
   // Check for UI resources first
   const uiResource = isContentUIResource(result) ? extractUIResource(result) : null;
@@ -529,18 +588,27 @@ function ToolResultView({ result, isStartExpanded }: ToolResultViewProps) {
 
   if (uiResource) {
     console.log('✅ Rendering UI resource:', uiResource);
+    console.log('🎯 Using Goose metadata:', gooseMeta);
+    
+    // Use Goose metadata for better UI configuration
+    const displayName = gooseMeta?.toolUI?.name || 'Interactive Output';
+    const displayType = gooseMeta?.toolUI?.displayType || 'inline';
+    const renderer = gooseMeta?.toolUI?.renderer || 'mcp-ui';
+    
+    console.log('🎯 UI Configuration:', { displayName, displayType, renderer });
+    
     return (
       <div className="w-full">
         <div className="pl-4 py-1 font-medium text-sm text-gray-600 border-b border-gray-200">
-          Interactive Output
+          {displayName} {displayType === 'sidecar' ? '(Sidecar)' : '(Inline)'}
         </div>
         <div className="w-full">
           <UIResourceRenderer
             resource={uiResource}
-            className="w-full min-h-0"
+            className={`w-full ${displayType === 'inline' ? 'min-h-0' : 'min-h-96'}`}
             onUIAction={async (action) => {
               console.log('UI Action from tool result:', action);
-              // TODO: Implement UI action handling
+              // TODO: Implement UI action handling for Goose
               return { status: 'handled' };
             }}
           />

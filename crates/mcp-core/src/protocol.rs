@@ -233,6 +233,9 @@ pub struct CallToolResult {
     pub content: Vec<Content>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_error: Option<bool>,
+    /// Optional metadata for enhanced tool responses (e.g., Goose UI metadata)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub _meta: Option<Value>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]

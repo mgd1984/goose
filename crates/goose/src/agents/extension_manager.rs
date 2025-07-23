@@ -698,9 +698,21 @@ impl ExtensionManager {
             };
             
             result
-                .map(|call| {
+                .map(|call_result| {
                     // Post-process content to detect UI resources that were returned as text
-                    Self::process_potential_ui_content(call.content)
+                    let mut processed_content = Self::process_potential_ui_content(call_result.content);
+                    
+                    // If there's metadata, attach it to the first content item's annotations
+                    if let Some(meta) = call_result._meta {
+                        if let Some(first_content) = processed_content.first_mut() {
+                            // Add the metadata to the content's annotations
+                            let mut annotations = first_content.annotations.clone().unwrap_or_default();
+                            annotations.insert("_meta".to_string(), meta);
+                            first_content.annotations = Some(annotations);
+                        }
+                    }
+                    
+                    processed_content
                 })
                 .map_err(|e| ToolError::ExecutionError(e.to_string()))
         };

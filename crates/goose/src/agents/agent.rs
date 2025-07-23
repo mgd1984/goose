@@ -961,8 +961,26 @@ impl Agent {
                                                 if enable_extension_request_ids.contains(&request_id) && output.is_err(){
                                                     all_install_successful = false;
                                                 }
+                                                
+                                                // Extract metadata from content annotations if present
+                                                let metadata = if let Ok(ref result) = output {
+                                                    result
+                                                        .first()
+                                                        .and_then(|content| content.annotations.as_ref())
+                                                        .and_then(|annotations| annotations.get("_meta"))
+                                                        .cloned()
+                                                } else {
+                                                    None
+                                                };
+                                                
                                                 let mut response = message_tool_response.lock().await;
-                                                *response = response.clone().with_tool_response(request_id, output);
+                                                *response = if metadata.is_some() {
+                                                    response.clone().with_content(
+                                                        MessageContent::tool_response_with_meta(request_id, output, metadata)
+                                                    )
+                                                } else {
+                                                    response.clone().with_tool_response(request_id, output)
+                                                };
                                             },
                                             ToolStreamItem::Message(msg) => {
                                                 yield AgentEvent::McpNotification((request_id, msg))

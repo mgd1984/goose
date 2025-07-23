@@ -32,11 +32,17 @@ class MCPUIErrorBoundary extends React.Component<
 
   static getDerivedStateFromError(error: Error) {
     console.error('🚨 MCP-UI Error Boundary caught error:', error);
+    console.error('🚨 Error details:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    });
     return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('🚨 MCP-UI Error Boundary details:', error, errorInfo);
+    console.error('🚨 Component stack:', errorInfo.componentStack);
   }
 
   render() {
@@ -75,7 +81,9 @@ export const UIResourceRenderer: React.FC<UIResourceRendererProps> = ({
   const mcpResource: Partial<Resource> = {
     uri: resource.uri,
     mimeType: resource.mimeType,
-    text: resource.text
+    text: resource.text,
+    name: resource.name,
+    description: resource.description
   };
 
   console.log('🔄 Converted MCP resource for @mcp-ui/client:', mcpResource);
@@ -106,10 +114,7 @@ export const UIResourceRenderer: React.FC<UIResourceRendererProps> = ({
   );
 
   console.log('🔄 Attempting to render with @mcp-ui/client...');
-  
-  // TEMPORARY: Force fallback to test iframe rendering
-  console.log('🚨 FORCING FALLBACK for testing...');
-  return fallbackRenderer;
+  console.log('🔄 MCP resource being passed to @mcp-ui/client:', mcpResource);
   
   return (
     <MCPUIErrorBoundary fallback={fallbackRenderer}>
