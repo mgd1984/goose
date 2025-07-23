@@ -2,13 +2,13 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Button } from './ui/button';
 import { ToolCallArguments, ToolCallArgumentValue } from './ToolCallArguments';
 import MarkdownContent from './MarkdownContent';
-import { Content, ToolRequestMessageContent, ToolResponseMessageContent } from '../types/message';
+import { Content, ResourceContents, ToolRequestMessageContent, ToolResponseMessageContent } from '../types/message';
 import { cn, snakeToTitleCase } from '../utils';
 import Dot, { LoadingStatus } from './ui/Dot';
 import { NotificationEvent } from '../hooks/useMessageStream';
 import { ChevronRight, LoaderCircle } from 'lucide-react';
 import { TooltipWrapper } from './settings/providers/subcomponents/buttons/TooltipWrapper';
-import { UIResourceRenderer, isUIResource, extractUIResource } from './UIResourceRenderer';
+import { UIResourceRenderer, isContentUIResource, extractUIResource } from './UIResourceRenderer';
 
 interface ToolCallWithResponseProps {
   isCancelledMessage: boolean;
@@ -514,20 +514,30 @@ interface ToolResultViewProps {
 }
 
 function ToolResultView({ result, isStartExpanded }: ToolResultViewProps) {
-  // Check if this result contains a UI resource
-  const uiResource = isUIResource(result) ? extractUIResource(result) : null;
+  console.log('🔍 ToolResultView checking result:', result);
+  console.log('🔍 Result type:', result.type);
+  console.log('🔍 Result keys:', Object.keys(result));
+  
+  // Check for UI resources first
+  const uiResource = isContentUIResource(result) ? extractUIResource(result) : null;
+  
+  console.log('🔍 UI resource detection result:', {
+    isUIResource: isContentUIResource(result),
+    extractedUIResource: uiResource,
+    resultType: result.type
+  });
 
   if (uiResource) {
     console.log('✅ Rendering UI resource:', uiResource);
     return (
-      <ToolCallExpandable
-        label={<span className="pl-4 py-1 font-medium">Interactive Output</span>}
-        isStartExpanded={isStartExpanded}
-      >
-        <div className="pl-4 pr-4 py-4">
+      <div className="w-full">
+        <div className="pl-4 py-1 font-medium text-sm text-gray-600 border-b border-gray-200">
+          Interactive Output
+        </div>
+        <div className="w-full">
           <UIResourceRenderer
             resource={uiResource}
-            className="w-full"
+            className="w-full min-h-0"
             onUIAction={async (action) => {
               console.log('UI Action from tool result:', action);
               // TODO: Implement UI action handling
@@ -535,10 +545,11 @@ function ToolResultView({ result, isStartExpanded }: ToolResultViewProps) {
             }}
           />
         </div>
-      </ToolCallExpandable>
+      </div>
     );
   }
 
+  // Only wrap non-UI resources in ToolCallExpandable
   return (
     <ToolCallExpandable
       label={<span className="pl-4 py-1 font-medium">Output</span>}

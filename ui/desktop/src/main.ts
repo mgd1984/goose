@@ -1611,40 +1611,26 @@ app.whenReady().then(async () => {
     }
   });
 
-  // Add CSP headers to all sessions
+  // Set up Content Security Policy to allow UI resources and sandboxed iframes
+  const csp = [
+    "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:",
+    "style-src 'self' 'unsafe-inline' data: blob:",
+    "img-src 'self' data: blob: https: http:",
+    "font-src 'self' data: blob: https: http:",
+    "connect-src 'self' data: blob: https: http: ws: wss:",
+    "frame-src 'self' data: blob: https: http:",
+    "child-src 'self' data: blob: https: http:",
+    "object-src 'none'",
+    "base-uri 'self'"
+  ].join('; ');
+  
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: {
         ...details.responseHeaders,
-        'Content-Security-Policy':
-          "default-src 'self';" +
-          // Allow inline styles since we use them in our React components
-          "style-src 'self' 'unsafe-inline';" +
-          // Scripts from our app and inline scripts (for theme initialization)
-          "script-src 'self' 'unsafe-inline';" +
-          // Images from our app and data: URLs (for base64 images)
-          "img-src 'self' data: https:;" +
-          // Connect to our local API and specific external services
-          "connect-src 'self' http://127.0.0.1:* https://api.github.com https://github.com https://objects.githubusercontent.com" +
-          // Don't allow any plugins
-          "object-src 'none';" +
-          // Don't allow any frames
-          "frame-src 'none';" +
-          // Font sources - allow self, data URLs, and external fonts
-          "font-src 'self' data: https:;" +
-          // Media sources - allow microphone
-          "media-src 'self' mediastream:;" +
-          // Form actions
-          "form-action 'none';" +
-          // Base URI restriction
-          "base-uri 'self';" +
-          // Manifest files
-          "manifest-src 'self';" +
-          // Worker sources
-          "worker-src 'self';" +
-          // Upgrade insecure requests
-          'upgrade-insecure-requests;',
-      },
+        'Content-Security-Policy': csp
+      }
     });
   });
 

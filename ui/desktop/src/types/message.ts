@@ -108,6 +108,7 @@ export interface SummarizationRequestedContent {
 export type MessageContent =
   | TextContent
   | ImageContent
+  | ResourceContent
   | ToolRequestMessageContent
   | ToolResponseMessageContent
   | ToolConfirmationRequestMessageContent
