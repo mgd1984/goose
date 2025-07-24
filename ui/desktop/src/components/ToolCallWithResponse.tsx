@@ -586,7 +586,11 @@ function ToolResultView({ result, isStartExpanded, gooseMeta }: ToolResultViewPr
     resultType: result.type
   });
 
+  console.log('🚨 CRITICAL CHECK: uiResource truthy?', !!uiResource);
+  console.log('🚨 CRITICAL CHECK: uiResource value:', uiResource);
+
   if (uiResource) {
+    console.log('🚨 INSIDE UI RESOURCE BLOCK - SUCCESS!');
     console.log('✅ Rendering UI resource:', uiResource);
     console.log('🎯 Using Goose metadata:', gooseMeta);
     
@@ -596,6 +600,7 @@ function ToolResultView({ result, isStartExpanded, gooseMeta }: ToolResultViewPr
     const renderer = gooseMeta?.toolUI?.renderer || 'mcp-ui';
     
     console.log('🎯 UI Configuration:', { displayName, displayType, renderer });
+    console.log('🚀 ABOUT TO CALL UIResourceRenderer WITH:', uiResource);
     
     return (
       <div className="w-full">
