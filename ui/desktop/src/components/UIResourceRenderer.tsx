@@ -163,6 +163,16 @@ export function isContentUIResource(content: Content): boolean {
 export function isUIResource(resource: ResourceContents): boolean {
   console.log('🔍 isUIResource checking:', resource);
   
+  // Add this right before the MIME type extraction
+  console.log('🔍 DEBUG: Raw resource structure:', {
+    resource,
+    hasMimeType: !!(resource as any).mimeType,
+    hasMime_type: !!resource.mime_type,
+    allKeys: Object.keys(resource),
+    nestedResource: (resource as any).resource,
+    nestedKeys: (resource as any).resource ? Object.keys((resource as any).resource) : []
+  });
+
   // Check MIME type (both formats)
   const mimeType = resource.mime_type || (resource as any).mimeType;
   console.log('🎯 MIME type found:', mimeType);
