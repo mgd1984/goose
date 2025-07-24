@@ -38,6 +38,7 @@ class MCPUIErrorBoundary extends React.Component<
       message: error.message,
       stack: error.stack
     });
+    console.error('🚨 This likely means the MCP-UI client failed to render the resource');
     return { hasError: true, error };
   }
 
@@ -131,6 +132,16 @@ export const UIResourceRenderer: React.FC<UIResourceRendererProps> = ({
     librarySize: gooseComponentLibrary.size,
     hasRemoteElements: !!gooseRemoteElements,
     remoteElementsCount: gooseRemoteElements.length
+  });
+  
+  // CRITICAL DEBUG: Check if this is Remote DOM
+  console.log('🎯 MIME TYPE ANALYSIS:', {
+    mimeType: mcpResource.mimeType,
+    isRemoteDOM: mcpResource.mimeType?.includes('remote-dom'),
+    isReact: mcpResource.mimeType?.includes('framework=react'),
+    hasText: !!mcpResource.text,
+    textLength: mcpResource.text?.length,
+    textHasRemoteDOMScript: mcpResource.text?.includes('createElement') || mcpResource.text?.includes('product-card')
   });
 
   // CRITICAL: Use the exact same pattern as the original author
@@ -247,20 +258,34 @@ export function extractUIResource(content: Content): UIResource | null {
     const textContent = getResourceText(resource);
     const originalMimeType = resource.mime_type || (resource as any).mimeType;
 
+    console.log('🔥 EXTRACTION DETAILS:', {
+      hasTextContent: !!textContent,
+      textContentLength: textContent?.length,
+      textContentPreview: textContent?.substring(0, 100),
+      originalMimeType,
+      resourceUri: resource.uri
+    });
+
     if (textContent) {
       console.log('🔍 Extracting text content:', textContent.substring(0, 100) + '...');
+      console.log('🔍 Original MIME type:', originalMimeType);
       
-      // Convert to UI Resource format
+      // Convert to UI Resource format - USE THE ACTUAL CONTENT AND MIME TYPE
       const extractedResource: UIResource = {
         uri: resource.uri,
-        mimeType: originalMimeType || 'text/html',
-        text: textContent,
+        mimeType: originalMimeType || 'text/html', // Use the actual MIME type from server
+        text: textContent, // Use the actual content from server (Remote DOM script)
         name: 'UI Resource',
-        title: 'UI Resource',
+        title: 'UI Resource', 
         description: 'Interactive UI component',
       };
       
-      console.log('✅ Successfully extracted UI resource:', extractedResource);
+      console.log('✅ Successfully extracted UI resource with REAL content:', {
+        uri: extractedResource.uri,
+        mimeType: extractedResource.mimeType,
+        textPreview: extractedResource.text.substring(0, 200) + '...',
+        textLength: extractedResource.text.length
+      });
       return extractedResource;
     }
   }
