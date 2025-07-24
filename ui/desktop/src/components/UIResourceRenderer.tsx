@@ -298,8 +298,29 @@ export function extractUIResource(content: Content): UIResource | null {
 
 // Safe helper to extract text from ResourceContents
 function getResourceText(resource: ResourceContents): string | null {
+  console.log('🔍 getResourceText called with resource:', resource);
+  console.log('🔍 Resource has text property?', 'text' in resource);
+  console.log('🔍 Resource text type:', typeof (resource as any).text);
+  console.log('🔍 Resource keys:', Object.keys(resource));
+  
   if ('text' in resource && typeof resource.text === 'string') {
+    console.log('✅ Successfully extracted text content:', resource.text.substring(0, 100) + '...');
     return resource.text;
   }
+  
+  // FALLBACK: Check for other possible text properties
+  if ('blob' in resource && typeof resource.blob === 'string') {
+    console.log('🔄 Found blob content, attempting base64 decode...');
+    try {
+      const decoded = atob(resource.blob);
+      console.log('✅ Successfully decoded blob content:', decoded.substring(0, 100) + '...');
+      return decoded;
+    } catch (e) {
+      console.log('⚠️ Blob decode failed, using raw blob:', resource.blob.substring(0, 100) + '...');
+      return resource.blob;
+    }
+  }
+  
+  console.log('❌ No text content found in resource');
   return null;
 } 
