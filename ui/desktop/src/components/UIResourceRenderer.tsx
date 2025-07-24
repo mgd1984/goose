@@ -86,6 +86,16 @@ export const UIResourceRenderer: React.FC<UIResourceRendererProps> = ({
       text: resource.text,
     };
     console.log('🔄 Final MCP resource for @mcp-ui/client:', result);
+    
+    // CRITICAL DEBUG: Check the Remote DOM script content
+    if (result.mimeType?.includes('remote-dom')) {
+      console.log('🧪 REMOTE DOM SCRIPT DEBUG:');
+      console.log('📄 Script preview (first 500 chars):', result.text?.substring(0, 500));
+      console.log('📄 Script contains createElement?', result.text?.includes('createElement'));
+      console.log('📄 Script contains product-card?', result.text?.includes('product-card'));
+      console.log('📄 Script has execution logic?', result.text?.includes('appendChild') || result.text?.includes('setAttribute'));
+    }
+    
     return result;
   }, [resource]);
 
@@ -113,6 +123,15 @@ export const UIResourceRenderer: React.FC<UIResourceRendererProps> = ({
       </div>
     </div>
   );
+
+  // Add debugging before rendering
+  console.log('🚀 About to render MCPUIResourceRenderer with:', {
+    resource: mcpResource,
+    hasLibrary: !!gooseComponentLibrary,
+    librarySize: gooseComponentLibrary.size,
+    hasRemoteElements: !!gooseRemoteElements,
+    remoteElementsCount: gooseRemoteElements.length
+  });
 
   // CRITICAL: Use the exact same pattern as the original author
   return (
