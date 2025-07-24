@@ -304,6 +304,58 @@ export const gooseComponentLibrary = new Map<string, React.ComponentType<any>>([
   ['flow-placeholder', FlowPlaceholder],
 ]);
 
+// Remote element definitions for our custom components
+export const gooseRemoteElements = [
+  {
+    tagName: 'product-catalog',
+    remoteAttributes: ['title', 'subtitle', 'interactive'],
+  },
+  {
+    tagName: 'product-card',
+    remoteAttributes: [
+      'id',
+      'name',
+      'sku',
+      'description',
+      'category',
+      'price',
+      'currency',
+      'image-url',
+      'variants',
+      'interactive',
+    ],
+    remoteEvents: ['click'],
+  },
+  {
+    tagName: 'pricing-calculator',
+    remoteAttributes: ['title', 'total', 'currency', 'interactive'],
+  },
+  {
+    tagName: 'cost-item',
+    remoteAttributes: ['label', 'amount', 'currency', 'index'],
+  },
+  {
+    tagName: 'cost-summary',
+    remoteAttributes: ['subtotal', 'shipping', 'tax', 'total', 'currency'],
+  },
+  {
+    tagName: 'design-preview',
+    remoteAttributes: ['title', 'interactive'],
+  },
+  {
+    tagName: 'preview-placeholder',
+    remoteAttributes: ['message'],
+  },
+  {
+    tagName: 'order-flow',
+    remoteAttributes: ['title', 'interactive'],
+  },
+  {
+    tagName: 'flow-placeholder',
+    remoteAttributes: ['message'],
+  },
+];
+
 // Export individual components for testing/standalone use
 export {
   ProductCard,
