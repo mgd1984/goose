@@ -70,24 +70,24 @@ export const UIResourceRenderer: React.FC<UIResourceRendererProps> = ({
   }
 
   // Handle UI actions - use the correct UIActionResult type
-  const handleUIAction = async (result: UIActionResult): Promise<unknown> => {
+  const handleUIAction = React.useCallback(async (result: UIActionResult): Promise<unknown> => {
     console.log('🎯 UI Action received from MCP-UI client:', result);
     if (onUIAction) {
       return await onUIAction(result);
     }
     return undefined;
-  };
+  }, [onUIAction]);
 
-  // Convert our resource format to the official MCP SDK Resource format
-  const mcpResource: Partial<Resource> = {
-    uri: resource.uri,
-    mimeType: resource.mimeType,
-    text: resource.text,
-    name: resource.name,
-    description: resource.description
-  };
-
-  console.log('🔄 Converted MCP resource for @mcp-ui/client:', mcpResource);
+  // SIMPLIFIED: Convert to the exact format expected by MCP-UI client (following original author's pattern)
+  const mcpResource = React.useMemo(() => {
+    const result = {
+      uri: resource.uri,
+      mimeType: resource.mimeType,
+      text: resource.text,
+    };
+    console.log('🔄 Final MCP resource for @mcp-ui/client:', result);
+    return result;
+  }, [resource]);
 
   // Create the fallback component
   const fallbackRenderer = (
@@ -114,19 +114,13 @@ export const UIResourceRenderer: React.FC<UIResourceRendererProps> = ({
     </div>
   );
 
-  console.log('🔄 Attempting to render with @mcp-ui/client...');
-  console.log('🔄 MCP resource being passed to @mcp-ui/client:', mcpResource);
-  
+  // CRITICAL: Use the exact same pattern as the original author
   return (
     <MCPUIErrorBoundary fallback={fallbackRenderer}>
-      <div className={className} style={{ width: '100%', minHeight: '300px' }}>
+      <div className={className}>
         <MCPUIResourceRenderer
           resource={mcpResource}
           onUIAction={handleUIAction}
-          supportedContentTypes={['rawHtml', 'externalUrl', 'remoteDom']}
-          htmlProps={{
-            style: { width: '100%', minHeight: '300px', border: 'none' }
-          }}
           remoteDomProps={{
             library: gooseComponentLibrary as any,
             remoteElements: gooseRemoteElements,
